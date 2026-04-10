@@ -1,0 +1,28 @@
+# ignore everything
+*
+
+# but keep these files / folders
+!utils/
+!utils/CleanTargetProjector.py
+!utils/data_process.py
+!utils/utils.py
+
+!configs/
+!configs/**
+
+!data/
+
+!dataset/
+!dataset/mrc_dataset.py
+!dataset/rgb_dataset.py
+
+!models/
+!models/**
+
+!train.py
+!dataset_split.py
+!requirements.txt
+!README.md
+
+# keep gitignore itself
+!.gitignore
