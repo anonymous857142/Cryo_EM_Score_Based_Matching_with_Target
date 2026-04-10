@@ -56,6 +56,8 @@ You may adapt package versions to match your local CUDA, PyTorch, and system con
 
 This repository does not ship with raw data or CSV split files. The `data/` directory is intentionally included as an empty placeholder.
 
+Before preparing CSV files, first adapt the config files under `configs/` to your dataset characteristics (for example, image size, normalization/statistics assumptions, and training/inference settings).
+
 Before training, prepare your own dataset in the following form:
 
 1. Put your MRC or related input files under your local data root.
@@ -116,7 +118,7 @@ python3 train.py --dataset 10081
 **2. Ab initio clean targets (`--abinitio true --mix false`)**
 
 Use this when your clean targets come from ab initio reconstruction.
-Loads `clean_{dataset}_abinitio.csv` instead of `clean_{dataset}.csv`.
+Loads `clean_{dataset}_abinitio.csv` instead of `clean_{dataset}_10A.csv`.
 Same single-softmax projector logic as above.
 
 ```bash
@@ -135,6 +137,34 @@ receives low-frequency (10A) and high-frequency (3A) supervision.
 ```bash
 python3 train.py --dataset 10081 --mix true
 ```
+
+## Inference (Test)
+
+Inference is run through `train.py` with `--exp_name test` and a checkpoint.
+
+For your current ab initio setup, use:
+
+```bash
+python3 train.py \
+	--dataset 10081 \
+	--exp_name test \
+	--config_json configs/gaussian_map.json \
+	--checkpoint /shared/scratch/0/home/v_xiaoqi_wu/TSM_denoising/Unsupervised_Denoising_TSM/results/train/10081/TSM/ckpt/10081_TSM_abinitio2.pt \
+	--abinitio true \
+	--mix false \
+	--data_dir data \
+	--device 0
+```
+
+Notes:
+
+- `--exp_name test` switches to inference mode.
+- `--checkpoint` must point to a valid `.pt` checkpoint file.
+- Set clean mode flags to match how your clean CSV is prepared:
+	- `--abinitio true --mix false` -> `clean_{dataset}_abinitio.csv`
+	- `--abinitio false --mix true` -> `clean_{dataset}_10A_3A.csv`
+	- `--abinitio false --mix false` -> `clean_{dataset}_10A.csv`
+- Test outputs are written under `results/test/{dataset}_test_outputs_TSM_10A+3A/`.
 
 ## Notes
 
