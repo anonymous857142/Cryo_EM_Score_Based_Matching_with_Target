@@ -266,7 +266,7 @@ def main(args: argparse.Namespace):
 
     log_file = os.path.join(
         log_dir,
-        f"{dataset_tag}_{cfg.running_config.model_type}_train_TSM_10A+3A.log"
+        f"{dataset_tag}_{cfg.running_config.model_type}_train_TSM_abinitio4.log"
     )
     logger = logging.getLogger("train")
     logger.setLevel(logging.INFO)
@@ -335,7 +335,7 @@ def main(args: argparse.Namespace):
         print(f"[INFO] Loaded checkpoint from {args.checkpoint}")
 
         # Run sliding-window test
-        save_dir = os.path.join(test_root, f"{dataset_tag}_test_outputs_TSM_10A+3A")
+        save_dir = os.path.join(test_root, f"{dataset_tag}_test_outputs_TSM_abinitio4")
         os.makedirs(save_dir, exist_ok=True)
         csv_path = f"{save_dir}/test_particle_stats.csv"
         csv_file = open(csv_path, "w", newline="")
@@ -402,7 +402,7 @@ def main(args: argparse.Namespace):
         tp_loader = DataLoader(tp_dataset, batch_size=8, shuffle=False)
         fp_loader = DataLoader(fp_dataset, batch_size=8, shuffle=False)
 
-        save_dir = os.path.join(compare_root, f"feature_maps_{dataset_tag}_TSM_10A+3A")
+        save_dir = os.path.join(compare_root, f"feature_maps_{dataset_tag}_TSM_abinitio4")
         os.makedirs(save_dir, exist_ok=True)
 
         def extract_features(loader, label):
@@ -557,7 +557,7 @@ def main(args: argparse.Namespace):
 
                 visualization_path = os.path.join(
                     train_vis_dir,
-                    f"{dataset_tag}_{category_tag}_10A+3A",
+                    f"{dataset_tag}_{category_tag}_abinitio4",
                     f"step_{global_step}"
                 )
                 os.makedirs(visualization_path, exist_ok=True)
@@ -576,7 +576,7 @@ def main(args: argparse.Namespace):
                 
                 if metrics['ssim'].mean()>best_ssim:
                     best_ssim = metrics['ssim'].mean()
-                    checkpoint_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_best_model_TSM_10A+3A.pt")
+                    checkpoint_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_best_model_TSM_abinitio4.pt")
                     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
                     torch.save({
                         "epoch": epoch,
@@ -600,9 +600,9 @@ def main(args: argparse.Namespace):
             # f"Mean sim {mean_similarity:.3f}"
         # )
 
-    final_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_TSM_10A+3A.pt")
-    plot_save_path = os.path.join(train_loss_dir, f"{dataset_tag}_loss_TSM_10A+3A.png")
-    sim_path = os.path.join(train_sim_dir, f"{dataset_tag}_sim_TSM_10A+3A.png")
+    final_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_TSM_abinitio4.pt")
+    plot_save_path = os.path.join(train_loss_dir, f"{dataset_tag}_loss_TSM_abinitio4.png")
+    sim_path = os.path.join(train_sim_dir, f"{dataset_tag}_sim_TSM_abinitio4.png")
     plot_loss_curves(
         train_loss_history,
         val_loss_history,
