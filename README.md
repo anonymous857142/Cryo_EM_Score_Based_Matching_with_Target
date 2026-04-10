@@ -1,8 +1,8 @@
-# Unsupervised Denoising TSM
+# Score-Based Matching with Target Guidance for Cryo-EM Denoising
 
 ## Overview
 
-This repository provides the reference implementation of an unsupervised denoising method based on TSM for cryo-EM style micrograph and particle data. The codebase includes model definition, dataset loading, clean-target projection utilities, data preprocessing, and training scripts required to reproduce the method at a code level.
+This repository provides the reference implementation of Score-Based Matching with Target Guidance for Cryo-EM Denoising. The codebase includes model definition, dataset loading, clean-target projection utilities, data preprocessing, and training scripts required to reproduce the method at a code level.
 
 This public release is organized for anonymous sharing. It contains the training and inference pipeline, but excludes private datasets, derived CSV lists, checkpoints, and experiment artifacts.
 
@@ -15,7 +15,7 @@ This public release is organized for anonymous sharing. It contains the training
 │   └── (empty, directory only; data files are not included)
 ├── dataset/
 │   ├── mrc_dataset.py
-│   └── mgb_dataset.py
+│   └── rgb_dataset.py
 ├── models/
 ├── utils/
 │   ├── CleanTargetProjector.py
