@@ -35,9 +35,9 @@
       50,
       1
     ],
-    "a": 0.3,
+    "a": 0.4,
     "b": 0.01,
-    "num_iteration": 7,
+    "num_iteration": 5,
     "network_config": {
       "image_size": 256,
       "image_type": "mrc",

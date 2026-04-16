@@ -146,12 +146,12 @@ For your current ab initio setup, use:
 
 ```bash
 python3 train.py \
-	--dataset 10081 \
+	--dataset 11183 \
 	--exp_name test \
 	--config_json configs/gaussian_map.json \
-	--checkpoint /shared/scratch/0/home/v_xiaoqi_wu/TSM_denoising/Unsupervised_Denoising_TSM/results/train/10081/TSM/ckpt/10081_TSM_abinitio2.pt \
-	--abinitio true \
-	--mix false \
+	--checkpoint /path/to/TSM_denoising/Unsupervised_Denoising_TSM/results/train/11183/TSM/ckpt/11183_TSM_10A_3A_3.pt \
+	--abinitio false \
+	--mix true \
 	--data_dir data \
 	--device 0
 ```

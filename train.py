@@ -266,7 +266,7 @@ def main(args: argparse.Namespace):
 
     log_file = os.path.join(
         log_dir,
-        f"{dataset_tag}_{cfg.running_config.model_type}_train_TSM_abinitio4.log"
+        f"{dataset_tag}_{cfg.running_config.model_type}_train_TSM_10A_3A_10.log"
     )
     logger = logging.getLogger("train")
     logger.setLevel(logging.INFO)
@@ -335,7 +335,7 @@ def main(args: argparse.Namespace):
         print(f"[INFO] Loaded checkpoint from {args.checkpoint}")
 
         # Run sliding-window test
-        save_dir = os.path.join(test_root, f"{dataset_tag}_test_outputs_TSM_abinitio4")
+        save_dir = os.path.join(test_root, f"{dataset_tag}_test_outputs_TSM_10A_3A_10")
         os.makedirs(save_dir, exist_ok=True)
         csv_path = f"{save_dir}/test_particle_stats.csv"
         csv_file = open(csv_path, "w", newline="")
@@ -347,9 +347,11 @@ def main(args: argparse.Namespace):
                     batch = test_dataset[idx]
                 except FileNotFoundError as e:
                     logger.warning(f"[SKIP] Missing file at test_dataset[{idx}]: {e}")
+                    csv_file.flush()
                     continue
                 except Exception as e:
                     logger.warning(f"[SKIP] Failed to load test_dataset[{idx}]: {e}")
+                    csv_file.flush()
                     continue
 
                 fname = batch["file_name"]
@@ -371,21 +373,43 @@ def main(args: argparse.Namespace):
                 if micro.ndim == 4 and micro.shape[-1] in (1, 3):
                     micro = micro.permute(0, 3, 1, 2).contiguous()
 
-                denoised = sliding_window_inference(
-                    micro,
-                    model,
-                    device,
-                    window_size=args.img_size,
-                    overlap=args.img_size // 2,
-                    cfg=cfg.model_config,
-                    projector=projector,
-                    csv_writer=csv_writer,
-                    file_name=fname
-                )
+                try:
+                    logger.info(f"[PROGRESS] Processing image {idx+1}/{len(test_dataset)}: {fname}")
+                    denoised = sliding_window_inference(
+                        micro,
+                        model,
+                        device,
+                        window_size=args.img_size,
+                        overlap=args.img_size // 2,
+                        cfg=cfg.model_config,
+                        projector=projector,
+                        csv_writer=csv_writer,
+                        file_name=fname
+                    )
 
-                save_image(denoised.cpu(), out_path)
-                logger.info(f"[INFO] Saved {out_path}")
+                    save_image(denoised.cpu(), out_path)
+                    logger.info(f"[INFO] Saved {out_path}")
+                    csv_file.flush()
+
+                    # Clear GPU cache after each image
+                    if device.type == 'cuda':
+                        torch.cuda.empty_cache()
+
+                except RuntimeError as e:
+                    logger.error(f"[ERROR] RuntimeError processing {fname} at index {idx}: {e}")
+                    csv_file.flush()
+                    if "out of memory" in str(e).lower():
+                        logger.error("[ERROR] GPU Out of Memory! Trying to clear cache...")
+                        if device.type == 'cuda':
+                            torch.cuda.empty_cache()
+                    continue
+                except Exception as e:
+                    logger.error(f"[ERROR] Exception processing {fname} at index {idx}: {type(e).__name__}: {e}", exc_info=True)
+                    csv_file.flush()
+                    continue
+
         csv_file.close()
+        logger.info(f"[COMPLETE] Test finished. Results saved to {save_dir}")
         return
     
     elif args.exp_name == "compare":
@@ -402,7 +426,7 @@ def main(args: argparse.Namespace):
         tp_loader = DataLoader(tp_dataset, batch_size=8, shuffle=False)
         fp_loader = DataLoader(fp_dataset, batch_size=8, shuffle=False)
 
-        save_dir = os.path.join(compare_root, f"feature_maps_{dataset_tag}_TSM_abinitio4")
+        save_dir = os.path.join(compare_root, f"feature_maps_{dataset_tag}_TSM_10A_3A_10")
         os.makedirs(save_dir, exist_ok=True)
 
         def extract_features(loader, label):
@@ -557,7 +581,7 @@ def main(args: argparse.Namespace):
 
                 visualization_path = os.path.join(
                     train_vis_dir,
-                    f"{dataset_tag}_{category_tag}_abinitio4",
+                    f"{dataset_tag}_{category_tag}_10A_3A_10",
                     f"step_{global_step}"
                 )
                 os.makedirs(visualization_path, exist_ok=True)
@@ -576,7 +600,7 @@ def main(args: argparse.Namespace):
                 
                 if metrics['ssim'].mean()>best_ssim:
                     best_ssim = metrics['ssim'].mean()
-                    checkpoint_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_best_model_TSM_abinitio4.pt")
+                    checkpoint_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_best_model_TSM_10A_3A_10.pt")
                     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
                     torch.save({
                         "epoch": epoch,
@@ -600,9 +624,9 @@ def main(args: argparse.Namespace):
             # f"Mean sim {mean_similarity:.3f}"
         # )
 
-    final_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_TSM_abinitio4.pt")
-    plot_save_path = os.path.join(train_loss_dir, f"{dataset_tag}_loss_TSM_abinitio4.png")
-    sim_path = os.path.join(train_sim_dir, f"{dataset_tag}_sim_TSM_abinitio4.png")
+    final_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_TSM_10A_3A_10.pt")
+    plot_save_path = os.path.join(train_loss_dir, f"{dataset_tag}_loss_TSM_10A_3A_10.png")
+    sim_path = os.path.join(train_sim_dir, f"{dataset_tag}_sim_TSM_10A_3A_10.png")
     plot_loss_curves(
         train_loss_history,
         val_loss_history,
