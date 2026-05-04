@@ -3,9 +3,25 @@ import pandas as pd
 import numpy as np
 import torch
 import mrcfile
+import tifffile
 
 from torch.utils.data import Dataset
 import torch.nn.functional as F
+
+
+def _normalize_2d(arr: np.ndarray) -> torch.Tensor:
+    mean = float(arr.mean())
+    std = float(arr.std() + 1e-8)
+    arr = (arr - mean) / std
+    arr = np.clip(arr, -5.0, 5.0) / 5.0
+    return torch.from_numpy(arr)[None, ...]
+
+
+def read_tif(image_file: str) -> torch.Tensor:
+    arr = tifffile.imread(image_file).astype(np.float32)
+    if arr.ndim == 3:
+        arr = arr.mean(axis=0)
+    return _normalize_2d(arr)
 
 
 def read_mrc(image_file: str) -> torch.Tensor:
@@ -19,24 +35,10 @@ def read_mrc(image_file: str) -> torch.Tensor:
     with mrcfile.open(image_file, permissive=True) as mrc:
         arr = mrc.data.astype(np.float32)
 
-    max_slices = 1
-    if arr.ndim == 3 and arr.shape[0] > max_slices:
-        mid = arr.shape[0] // 2
-        arr = arr[mid]
-        mean = float(arr.mean())
-        std = float(arr.std() + 1e-8)
-        arr = (arr - mean) / std
-        arr = np.clip(arr, -5.0, 5.0) / 5.0
-        tensor = torch.from_numpy(arr)[None, ...]
-        return tensor
+    if arr.ndim == 3 and arr.shape[0] > 1:
+        arr = arr[arr.shape[0] // 2]
 
-    mean = float(arr.mean())
-    std = float(arr.std() + 1e-8)
-    arr = (arr - mean) / std
-    arr = np.clip(arr, -5.0, 5.0) / 5.0
-
-    tensor = torch.from_numpy(arr)[None, ...]
-    return tensor
+    return _normalize_2d(arr)
 
 
 class MRCDataset(Dataset):
@@ -84,7 +86,7 @@ class MRCDataset(Dataset):
             if self.dataset and self.abinitio:
                 candidates.append(f"clean_{self.dataset}_abinitio.csv")
             elif self.dataset and self.mix:
-                candidates.append(f"clean_{self.dataset}_10A_3A.csv")
+                candidates.append(f"clean_{self.dataset}_10A_5A_3A.csv")
             elif self.dataset:
                 candidates.append(f"clean_{self.dataset}_10A.csv")
             candidates.append("clean.csv")
@@ -134,7 +136,11 @@ class MRCDataset(Dataset):
         img_name = os.path.splitext(os.path.basename(rel_path))[0]
 
         abs_path = self._resolve_sample_path(rel_path)
-        image = read_mrc(abs_path)
+        ext = os.path.splitext(abs_path)[1].lower()
+        if ext in (".tif", ".tiff"):
+            image = read_tif(abs_path)
+        else:
+            image = read_mrc(abs_path)
         image = self._to_CHW(image)
 
         if self.mode == "clean":
