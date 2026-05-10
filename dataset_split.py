@@ -5,20 +5,14 @@ import random
 
 root_dir = "data"
 domains = [
-    "11056_particles_stack_tp+fp",
+    "10291_particles_stack_snr_0005",
 ]
 src_dirs = [os.path.join(root_dir, d) for d in domains]
 
-domain_clean_3A = "clean_images_11056_3A"
-domain_clean_5A = "clean_images_11056_5A"
-domain_clean_10A = "clean_images_11056_10A"
-domain_clean_20A = "clean_images_11056_20A"
-src_dir_clean_3A = os.path.join(root_dir, domain_clean_3A)
-src_dir_clean_5A = os.path.join(root_dir, domain_clean_5A)
-src_dir_clean_10A = os.path.join(root_dir, domain_clean_10A)
-src_dir_clean_20A = os.path.join(root_dir, domain_clean_20A)
+domain_clean_5A = "clean_images_10291_5A"
+src_dir_clean = os.path.join(root_dir, domain_clean_5A)
 
-domain_test = "11056_micrographs"
+domain_test = "10291_micrographs"
 src_dir_test = os.path.join(root_dir, domain_test)
 
 out_dir = root_dir
@@ -34,11 +28,9 @@ files = sorted(files)
 
 random.shuffle(files) 
 
-clean_files_3A = [f"{domain_clean_3A}/{f}" for f in os.listdir(src_dir_clean_3A) if f.endswith(".mrc")]
-clean_files_5A = [f"{domain_clean_5A}/{f}" for f in os.listdir(src_dir_clean_5A) if f.endswith(".mrc")]
-clean_files_10A = [f"{domain_clean_10A}/{f}" for f in os.listdir(src_dir_clean_10A) if f.endswith(".mrc")]
-clean_files_20A = [f"{domain_clean_20A}/{f}" for f in os.listdir(src_dir_clean_20A) if f.endswith(".mrc")]
-clean_files = clean_files_20A + clean_files_10A + clean_files_5A + clean_files_3A
+clean_files = []
+for d in [domain_clean_5A]:
+    clean_files.extend([f"{d}/{f}" for f in os.listdir(os.path.join(root_dir, d)) if f.endswith(".mrc")])
 test_files = [f for f in os.listdir(src_dir_test) if f.endswith(".mrc") or f.endswith(".tif") or f.endswith(".tiff")]
 
 n_total = len(files)
@@ -60,11 +52,11 @@ def save_csv(file_list, split):
             writer.writerow([rel_path])
     print(f"{csv_path} 已保存，共 {len(file_list)} 条")
 
-save_csv(train_files, "train_11056")
-save_csv(val_files, "val_11056")
+save_csv(train_files, "train_10291")
+save_csv(val_files, "val_10291")
 
 def save_csv_clean(file_list, clean):
-    csv_path = os.path.join(out_dir, f"clean_11056_20A_10A_5A_3A.csv")
+    csv_path = os.path.join(out_dir, "clean_10291_5A.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["path"])
@@ -75,7 +67,7 @@ def save_csv_clean(file_list, clean):
 save_csv_clean(clean_files, "clean")
 
 def save_csv_test(file_list):
-    csv_path = os.path.join(out_dir, "test_11056.csv")
+    csv_path = os.path.join(out_dir, "test_10291.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([domain_test])  # 列名改为 micrograph 域

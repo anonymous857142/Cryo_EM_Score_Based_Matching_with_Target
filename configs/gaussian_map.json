@@ -37,7 +37,7 @@
     ],
     "a": 0.3,
     "b": 0.01,
-    "num_iteration": 5,
+    "num_iteration": 3,
     "network_config": {
       "image_size": 256,
       "image_type": "mrc",
@@ -55,7 +55,7 @@
     },
     "postprocess_step_size": 0.7,
     "w_t_threshold": 0.93,
-    "alpha_tsm": 0.08
+    "alpha_tsm": 0.0
   },
   "optimizer_config": {
     "name": "Adam",

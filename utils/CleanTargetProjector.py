@@ -42,12 +42,13 @@ class CleanTargetProjector(nn.Module):
         print(f"[INFO] Clean feature matrix: {self.clean_feats.size()}")
 
         if self.mix:
-            # Separate 10A and 3A domains by folder name
-            indices_10A = [i for i, fn in enumerate(filenames) if "10A" in str(fn)]
-            indices_3A  = [i for i, fn in enumerate(filenames) if "3A"  in str(fn)]
-            self.indices_10A = torch.tensor(indices_10A, device=device, dtype=torch.long)
-            self.indices_3A  = torch.tensor(indices_3A,  device=device, dtype=torch.long)
-            print(f"[INFO] Mix mode: {len(indices_10A)} samples @ 10A, {len(indices_3A)} samples @ 3A")
+            self.mix_domains = {}
+            for tag in ["20A", "10A", "5A", "3A"]:
+                idx = [i for i, fn in enumerate(filenames) if f"_{tag}" in str(fn)]
+                if idx:
+                    self.mix_domains[tag] = torch.tensor(idx, device=device, dtype=torch.long)
+            counts = {t: len(v) for t, v in self.mix_domains.items()}
+            print(f"[INFO] Mix mode: {counts}")
         else:
             print(f"[INFO] Single-domain mode: all {self.clean_feats.size(0)} clean samples used directly")
 
@@ -81,11 +82,11 @@ class CleanTargetProjector(nn.Module):
         self.clean_images = clean_images.to(self.device)   # [K, C, H, W]
 
         if self.mix:
-            # Re-separate domains after refresh
-            indices_10A = [i for i, fn in enumerate(filenames) if "10A" in str(fn)]
-            indices_3A  = [i for i, fn in enumerate(filenames) if "3A"  in str(fn)]
-            self.indices_10A = torch.tensor(indices_10A, device=self.device, dtype=torch.long)
-            self.indices_3A  = torch.tensor(indices_3A,  device=self.device, dtype=torch.long)
+            self.mix_domains = {}
+            for tag in ["20A", "10A", "5A", "3A"]:
+                idx = [i for i, fn in enumerate(filenames) if f"_{tag}" in str(fn)]
+                if idx:
+                    self.mix_domains[tag] = torch.tensor(idx, device=self.device, dtype=torch.long)
 
     @torch.no_grad()
     def _extract_clean_features(self, dataloader):
@@ -153,17 +154,15 @@ class CleanTargetProjector(nn.Module):
             return best_idx, best_sim
 
     @torch.no_grad()
-    def get_weighted_target(self, noisy_images, tau=0.5, alpha_10A=0.5, alpha_3A=0.5):
+    def get_weighted_target(self, noisy_images, tau=0.5):
         """
         Unified entry point.
-        - mix=True:  split into 10A/3A domains, softmax each separately, combine by alpha.
+        - mix=True:  softmax each resolution domain separately, average across domains.
         - mix=False: softmax over all clean images at once (original behaviour).
         Returns (y_combined [B,C,H,W], best_sim [B])
         """
         if self.mix:
-            return self.get_weighted_target_dual_domain(
-                noisy_images, tau=tau, alpha_10A=alpha_10A, alpha_3A=alpha_3A
-            )
+            return self._get_weighted_target_multi_domain(noisy_images, tau=tau)
         else:
             return self._get_weighted_target_single(noisy_images, tau=tau)
 
@@ -195,25 +194,16 @@ class CleanTargetProjector(nn.Module):
         return y, best_sim
 
     @torch.no_grad()
-    def get_weighted_target_dual_domain(self, noisy_images, tau=0.5, alpha_10A=0.5, alpha_3A=0.5):
+    def _get_weighted_target_multi_domain(self, noisy_images, tau=0.5):
         """
-        Compute weighted clean target by separately softmax-ing 10A and 3A domains.
-        Then combine with alpha weights.
-        
-        Args:
-            noisy_images: [B, C, H, W] or [B, H, W, C]
-            tau: temperature for softmax
-            alpha_10A, alpha_3A: weights for combining domains (should sum to 1.0)
-        
-        Returns:
-            y_combined: [B, C, H, W] weighted combination of 10A and 3A targets
-            best_sim: [B] max similarity across all domains (for gating)
+        Softmax-weighted target with each resolution domain (20A/10A/5A/3A) contributing
+        equally: softmax within each domain, then average across present domains.
+        Returns (y_combined [B,C,H,W], best_sim [B])
         """
         if noisy_images.ndim == 4 and noisy_images.shape[1] != 1:
             noisy_images = noisy_images.permute(0, 3, 1, 2)
-
         noisy_images = noisy_images.to(self.device).float()
-        
+
         was_training = self.model.training
         self.model.eval()
 
@@ -225,35 +215,18 @@ class CleanTargetProjector(nn.Module):
 
         clean_feat = F.normalize(self.clean_feats, dim=1)
         sims_all = noisy_feat @ clean_feat.T   # [B, K]
-        
-        # Extract domain-specific similarities
-        if len(self.indices_10A) > 0:
-            sims_10A = sims_all[:, self.indices_10A]  # [B, K_10A]
-            weights_10A = torch.softmax(sims_10A / tau, dim=1)
-            clean_imgs_10A = self.clean_images[self.indices_10A]  # [K_10A, C, H, W]
-            y_10A = torch.einsum("bk,kchw->bchw", weights_10A, clean_imgs_10A)
-        else:
-            y_10A = None
-        
-        if len(self.indices_3A) > 0:
-            sims_3A = sims_all[:, self.indices_3A]  # [B, K_3A]
-            weights_3A = torch.softmax(sims_3A / tau, dim=1)
-            clean_imgs_3A = self.clean_images[self.indices_3A]  # [K_3A, C, H, W]
-            y_3A = torch.einsum("bk,kchw->bchw", weights_3A, clean_imgs_3A)
-        else:
-            y_3A = None
-        
-        # Combine domains
-        if y_10A is not None and y_3A is not None:
-            y_combined = alpha_10A * y_10A + alpha_3A * y_3A
-        elif y_10A is not None:
-            y_combined = y_10A
-        elif y_3A is not None:
-            y_combined = y_3A
-        else:
-            raise ValueError("No 10A or 3A samples found in clean dataset!")
-        
-        # Best similarity across all domains for gating
+
+        domain_targets = []
+        for indices in self.mix_domains.values():
+            sims_d   = sims_all[:, indices]                          # [B, K_d]
+            weights_d = torch.softmax(sims_d / tau, dim=1)          # [B, K_d]
+            imgs_d   = self.clean_images[indices]                    # [K_d, C, H, W]
+            domain_targets.append(torch.einsum("bk,kchw->bchw", weights_d, imgs_d))
+
+        if not domain_targets:
+            raise ValueError("No domain samples found in clean dataset for mix mode!")
+
+        y_combined = sum(domain_targets) / len(domain_targets)
         best_sim = sims_all.max(dim=1).values
 
         if was_training:

@@ -1,5 +1,6 @@
 import argparse
 import json
+import time
 import torch
 import logging
 import os
@@ -74,6 +75,7 @@ def compute_val_loss(val_dataloader, clean_dataloader, projector, model, cfg, gl
 
             # Use weighted target for validation (single or dual-domain depending on --mix)
             y_tsm, best_sim = projector.get_weighted_target(raw_noisy, tau=0.5)
+            y_tsm = F.interpolate(y_tsm, size=raw_noisy.shape[2:], mode="bilinear", align_corners=False)
             val_dict_tsm["clean_images"] = y_tsm
             val_dict_tsm["similarity"] = best_sim.detach()
 
@@ -243,7 +245,7 @@ def main(args: argparse.Namespace):
         cfg = EasyDict(json.load(f))
 
     dataset_tag = str(args.dataset)
-    category_tag = "TSM"
+    category_tag = "DSM"
 
     train_root = os.path.join("results", "train", dataset_tag, category_tag)
     train_ckpt_dir = os.path.join(train_root, "ckpt")
@@ -266,7 +268,7 @@ def main(args: argparse.Namespace):
 
     log_file = os.path.join(
         log_dir,
-        f"{dataset_tag}_{cfg.running_config.model_type}_train_TSM_10A_5A_3A_2.log"
+        f"{dataset_tag}_{cfg.running_config.model_type}_train_reb_2.log"
     )
     logger = logging.getLogger("train")
     logger.setLevel(logging.INFO)
@@ -303,7 +305,7 @@ def main(args: argparse.Namespace):
     train_dataset = MRCDataset(root_dir=args.data_dir, mode="train", dataset=args.dataset)
     val_dataset   = MRCDataset(root_dir=args.data_dir, mode="val", dataset=args.dataset)
     test_dataset  = MRCDataset(root_dir=args.data_dir, mode="test", dataset=args.dataset)
-    clean_dataset = MRCDataset(root_dir=args.data_dir, mode="clean", dataset=args.dataset, abinitio=args.abinitio, mix=args.mix)
+    clean_dataset = MRCDataset(root_dir=args.data_dir, mode="clean", dataset=args.dataset, abinitio=args.abinitio, mix=args.mix, ablation_dataset=args.ablation_data)
     
     train_dataloader = DataLoader(train_dataset,batch_size=1, shuffle=True, num_workers=0, collate_fn=collate_mrc)
     val_dataloader = DataLoader(val_dataset,batch_size=1, shuffle=False, num_workers=0, collate_fn=collate_mrc)
@@ -335,12 +337,13 @@ def main(args: argparse.Namespace):
         print(f"[INFO] Loaded checkpoint from {args.checkpoint}")
 
         # Run sliding-window test
-        save_dir = os.path.join(test_root, f"{dataset_tag}_test_outputs_TSM_10A_5A_3A_2")
+        save_dir = os.path.join(test_root, f"{dataset_tag}_test_outputs_reb_2_dsm")
         os.makedirs(save_dir, exist_ok=True)
         csv_path = f"{save_dir}/test_particle_stats.csv"
         csv_file = open(csv_path, "w", newline="")
         csv_writer = csv.writer(csv_file)
         csv_writer.writerow(["file_name","num_picked","total_windows","pick_ratio"])
+        t_test_start = time.time()
         with torch.no_grad():
             for idx in range(len(test_dataset)):
                 try:
@@ -409,6 +412,7 @@ def main(args: argparse.Namespace):
                     continue
 
         csv_file.close()
+        logger.info(f"[TIME] Test took {time.time() - t_test_start:.1f}s")
         logger.info(f"[COMPLETE] Test finished. Results saved to {save_dir}")
         return
     
@@ -426,7 +430,7 @@ def main(args: argparse.Namespace):
         tp_loader = DataLoader(tp_dataset, batch_size=8, shuffle=False)
         fp_loader = DataLoader(fp_dataset, batch_size=8, shuffle=False)
 
-        save_dir = os.path.join(compare_root, f"feature_maps_{dataset_tag}_TSM_10A_5A_3A_2")
+        save_dir = os.path.join(compare_root, f"feature_maps_{dataset_tag}_reb_2")
         os.makedirs(save_dir, exist_ok=True)
 
         def extract_features(loader, label):
@@ -473,6 +477,7 @@ def main(args: argparse.Namespace):
     else:
         raise ValueError(f"Unknown optimizer: {optim_name}")
 
+    t_train_start = time.time()
     logger.info("Train Start...")
     train_loss_history = []
     train_dsm_history = []
@@ -524,14 +529,10 @@ def main(args: argparse.Namespace):
             similarity_history.append((global_step, probe_sim.item()))
             logger.info(f"[Probe] Step {global_step}: similarity for probe batch = {probe_sim.item():.4f}")
 
-            # Get weighted clean target (single or dual-domain depending on --mix)
+            # Get weighted clean target (single or multi-domain depending on --mix)
             tau = 0.5   # smaller = closer to hard NN
-            y_tsm, best_sim = projector.get_weighted_target(
-                raw_noisy,
-                tau=tau,
-                alpha_10A=0.5,
-                alpha_3A=0.5,
-            )
+            y_tsm, best_sim = projector.get_weighted_target(raw_noisy, tau=tau)
+            y_tsm = F.interpolate(y_tsm, size=raw_noisy.shape[2:], mode="bilinear", align_corners=False)
             train_data_dict_tsm["clean_images"] = y_tsm
             train_data_dict_tsm["similarity"] = best_sim.detach()
             logger.info(f"[Batch] Step {global_step}: similarity for current batch = {best_sim.item():.4f}")
@@ -581,7 +582,7 @@ def main(args: argparse.Namespace):
 
                 visualization_path = os.path.join(
                     train_vis_dir,
-                    f"{dataset_tag}_{category_tag}_10A_5A_3A_2",
+                    f"{dataset_tag}_{category_tag}_reb_2",
                     f"step_{global_step}"
                 )
                 os.makedirs(visualization_path, exist_ok=True)
@@ -600,7 +601,7 @@ def main(args: argparse.Namespace):
                 
                 if metrics['ssim'].mean()>best_ssim:
                     best_ssim = metrics['ssim'].mean()
-                    checkpoint_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_best_model_TSM_10A_5A_3A_2.pt")
+                    checkpoint_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_best_model_reb_2.pt")
                     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
                     torch.save({
                         "epoch": epoch,
@@ -624,9 +625,9 @@ def main(args: argparse.Namespace):
             # f"Mean sim {mean_similarity:.3f}"
         # )
 
-    final_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_TSM_10A_5A_3A_2.pt")
-    plot_save_path = os.path.join(train_loss_dir, f"{dataset_tag}_loss_TSM_10A_5A_3A_2.png")
-    sim_path = os.path.join(train_sim_dir, f"{dataset_tag}_sim_TSM_10A_5A_3A_2.png")
+    final_path = os.path.join(train_ckpt_dir, f"{dataset_tag}_reb_2.pt")
+    plot_save_path = os.path.join(train_loss_dir, f"{dataset_tag}_loss_reb_2.png")
+    sim_path = os.path.join(train_sim_dir, f"{dataset_tag}_sim_reb_2.png")
     plot_loss_curves(
         train_loss_history,
         val_loss_history,
@@ -649,6 +650,7 @@ def main(args: argparse.Namespace):
     logger.info(f"Final model saved: {final_path}")
 
     
+    logger.info(f"[TIME] Training took {time.time() - t_train_start:.1f}s")
     logger.info("Training finished at step %d.", global_step)
     pbar.close()
 
@@ -675,6 +677,10 @@ if __name__ == "__main__":
     parser.add_argument("--mix", type=str2bool, nargs="?", const=True, default=False,
                         help="Mix 10A and 3A clean domains (folder names must contain '10A'/'3A')." \
                              " If False, use all clean images in a single softmax (default).")
+    parser.add_argument("--ablation_data", type=str, default=None,
+                        choices=["10081", "10291", "10289"],
+                        help="Use a different dataset as clean reference (ablation). "
+                             "If None, uses --dataset as clean reference (default).")
 
     args = parser.parse_args()
     main(args)

@@ -63,6 +63,7 @@ class MRCDataset(Dataset):
         dataset: str | None = None,
         abinitio: bool = False,
         mix: bool = False,
+        ablation_dataset: str | None = None,
     ):
         self.root_dir = root_dir
         self.mode = mode
@@ -70,7 +71,12 @@ class MRCDataset(Dataset):
         self.abinitio = abinitio
         self.mix = mix
 
-        csv_path = self._resolve_csv_path()
+        _resolvers = {
+            "10081": self._resolve_csv_path_10081,
+            "10291": self._resolve_csv_path_10291,
+            "10289": self._resolve_csv_path_10289,
+        }
+        csv_path = _resolvers[ablation_dataset]() if ablation_dataset in _resolvers else self._resolve_csv_path()
         df = pd.read_csv(csv_path)
         self.data = df.iloc[:, 0].dropna().astype(str).tolist()
 
@@ -109,6 +115,114 @@ class MRCDataset(Dataset):
 
         raise FileNotFoundError(
             f"Could not find a CSV split for mode={self.mode!r}, dataset={self.dataset!r}, "
+            f"abinitio={self.abinitio}. Tried {ordered_candidates} under {self.root_dir!r}."
+        )
+
+    # 10081
+    def _resolve_csv_path_10081(self) -> str:
+        candidates = []
+
+        if self.mode in {"tp", "fp"}:
+            candidates.append(f"{self.mode}.csv")
+        elif self.mode == "clean":
+            if self.dataset and self.abinitio:
+                candidates.append(f"clean_10081_abinitio.csv")
+            elif self.dataset and self.mix:
+                candidates.append(f"clean_10081_20A_10A_5A_3A.csv")
+            elif self.dataset:
+                candidates.append(f"clean_10081_10A.csv")
+            candidates.append("clean.csv")
+        else:
+            if self.dataset:
+                candidates.append(f"{self.mode}_{self.dataset}.csv")
+            candidates.append(f"{self.mode}.csv")
+
+        ordered_candidates = []
+        seen = set()
+        for name in candidates:
+            if name not in seen:
+                ordered_candidates.append(name)
+                seen.add(name)
+
+        for name in ordered_candidates:
+            csv_path = os.path.join(self.root_dir, name)
+            if os.path.exists(csv_path):
+                return csv_path
+
+        raise FileNotFoundError(
+            f"Could not find a CSV split for mode={self.mode!r}, dataset={'10081'!r}, "
+            f"abinitio={self.abinitio}. Tried {ordered_candidates} under {self.root_dir!r}."
+        )
+    
+    # 10291
+    def _resolve_csv_path_10291(self) -> str:
+        candidates = []
+
+        if self.mode in {"tp", "fp"}:
+            candidates.append(f"{self.mode}.csv")
+        elif self.mode == "clean":
+            if self.dataset and self.abinitio:
+                candidates.append(f"clean_10291_abinitio.csv")
+            elif self.dataset and self.mix:
+                candidates.append(f"clean_10291_20A_10A_5A.csv")
+            elif self.dataset:
+                candidates.append(f"clean_10291_10A.csv")
+            candidates.append("clean.csv")
+        else:
+            if self.dataset:
+                candidates.append(f"{self.mode}_{self.dataset}.csv")
+            candidates.append(f"{self.mode}.csv")
+
+        ordered_candidates = []
+        seen = set()
+        for name in candidates:
+            if name not in seen:
+                ordered_candidates.append(name)
+                seen.add(name)
+
+        for name in ordered_candidates:
+            csv_path = os.path.join(self.root_dir, name)
+            if os.path.exists(csv_path):
+                return csv_path
+
+        raise FileNotFoundError(
+            f"Could not find a CSV split for mode={self.mode!r}, dataset={'10291'!r}, "
+            f"abinitio={self.abinitio}. Tried {ordered_candidates} under {self.root_dir!r}."
+        )
+    
+    # 10289
+    def _resolve_csv_path_10289(self) -> str:
+        candidates = []
+
+        if self.mode in {"tp", "fp"}:
+            candidates.append(f"{self.mode}.csv")
+        elif self.mode == "clean":
+            if self.dataset and self.abinitio:
+                candidates.append(f"clean_10289_abinitio.csv")
+            elif self.dataset and self.mix:
+                candidates.append(f"clean_10289_20A_10A_5A_3A.csv")
+            elif self.dataset:
+                candidates.append(f"clean_10289_10A.csv")
+            candidates.append("clean.csv")
+        else:
+            if self.dataset:
+                candidates.append(f"{self.mode}_{self.dataset}.csv")
+            candidates.append(f"{self.mode}.csv")
+
+        ordered_candidates = []
+        seen = set()
+        for name in candidates:
+            if name not in seen:
+                ordered_candidates.append(name)
+                seen.add(name)
+
+        for name in ordered_candidates:
+            csv_path = os.path.join(self.root_dir, name)
+            if os.path.exists(csv_path):
+                return csv_path
+
+        raise FileNotFoundError(
+            f"Could not find a CSV split for mode={self.mode!r}, dataset={'10289'!r}, "
             f"abinitio={self.abinitio}. Tried {ordered_candidates} under {self.root_dir!r}."
         )
 

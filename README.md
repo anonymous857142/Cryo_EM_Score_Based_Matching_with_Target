@@ -135,7 +135,7 @@ and combines the results with equal weight (0.5 / 0.5) so every noisy sample sim
 receives low-frequency (10A) and high-frequency (3A) supervision.
 
 ```bash
-python3 train.py --dataset 10081 --mix true
+CUDA_VISIBLE_DEVICES=3 python3 train.py --dataset 10291 
 ```
 
 ## Inference (Test)
@@ -145,11 +145,11 @@ Inference is run through `train.py` with `--exp_name test` and a checkpoint.
 For your current ab initio setup, use:
 
 ```bash
-python3 train.py \
-	--dataset 11183 \
+CUDA_VISIBLE_DEVICES=4 python3 train.py \
+	--dataset 10406 \
 	--exp_name test \
 	--config_json configs/gaussian_map.json \
-	--checkpoint /path/to/TSM_denoising/Unsupervised_Denoising_TSM/results/train/11183/TSM/ckpt/11183_TSM_10A_3A_3.pt \
+	--checkpoint \to\path\TSM_denoising/Unsupervised_Denoising_TSM/results/train/10406/TSM/ckpt/10406_reb_2.pt \
 	--abinitio false \
 	--mix true \
 	--data_dir data \
@@ -164,7 +164,7 @@ Notes:
 	- `--abinitio true --mix false` -> `clean_{dataset}_abinitio.csv`
 	- `--abinitio false --mix true` -> `clean_{dataset}_10A_3A.csv`
 	- `--abinitio false --mix false` -> `clean_{dataset}_10A.csv`
-- Test outputs are written under `results/test/{dataset}_test_outputs_TSM_10A+3A/`.
+- Test outputs are written under `results/test/{dataset}_test_outputs_TSM_10A+3A_reb_1/`.
 
 ## Notes
 
